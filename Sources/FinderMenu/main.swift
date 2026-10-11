@@ -42,11 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Launched by a menu item, a findermenu:// link arrives right away; otherwise the user opened the app.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if !self.handledURL {
-                self.showSettings()
-            }
+        // Launched by a menu item, the findermenu:// link is delivered before this; otherwise the user opened the app.
+        if !handledURL {
+            showSettings()
         }
     }
 
