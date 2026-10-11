@@ -17,7 +17,9 @@ enable() {
     echo "Can't find $app" >&2
     exit 1
   fi
+  # Replace any existing copy: stop its extension and helper so nothing keeps running the old code.
   pkill -f FinderMenuExtension.appex 2>/dev/null || true
+  pkill -f "Finder Menu.app/Contents/MacOS/FinderMenu" 2>/dev/null || true
   mkdir -p "$DEST"
   rm -rf "$INSTALLED"
   cp -R "$app" "$DEST/"
@@ -42,6 +44,7 @@ disable() {
   pluginkit -e ignore -i "$EXT_ID" 2>/dev/null || true
   pluginkit -r "$INSTALLED/Contents/PlugIns/FinderMenuExtension.appex" 2>/dev/null || true
   pkill -f FinderMenuExtension.appex 2>/dev/null || true
+  pkill -f "Finder Menu.app/Contents/MacOS/FinderMenu" 2>/dev/null || true
   if [ -d "$INSTALLED" ]; then
     "$LSREGISTER" -u "$INSTALLED"
     rm -rf "$INSTALLED"

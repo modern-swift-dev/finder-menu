@@ -3,7 +3,7 @@ SWIFT_FILES ?= .
 
 SHELL := /bin/bash
 
-.PHONY: setup lint format
+.PHONY: setup lint format install uninstall
 
 setup:
 
@@ -22,3 +22,11 @@ format:
 
 	mint run --no-install nicklockwood/SwiftFormat $(SWIFT_FILES) --config .swiftformat --quiet
 	mint run --no-install realm/SwiftLint lint --config .swiftlint.yml --fix --quiet --force-exclude $(SWIFT_FILES)
+
+install:
+
+	./install.sh
+
+uninstall:
+
+	./uninstall.sh
