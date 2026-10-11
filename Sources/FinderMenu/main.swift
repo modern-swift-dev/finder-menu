@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var handledURL = false
     private var settingsWindow: SettingsWindowController?
+    private var settingsCloseObserver: NSObjectProtocol?
 
     func application(_ application: NSApplication, open urls: [URL]) {
         handledURL = true
@@ -19,18 +20,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for url in urls {
             guard let c = URLComponents(url: url, resolvingAgainstBaseURL: false),
                   let path = c.queryItems?.first(where: { $0.name == "path" })?.value,
-                  let dir = folder(for: path) else { continue }
+                  let dir = folder(for: path) else {
+                continue
+            }
             switch c.host {
-            case "newfile": newFile(in: dir)
-            case "terminal": openTerminal(at: dir); return
-            case "openwith":
-                let appID = c.queryItems?.first(where: { $0.name == "app" })?.value
-                // No app means "Other App…", where the user picks one themselves.
-                if let appID, !editors.contains(where: { $0.id == appID }) { continue }
-                openFolder(dir, appID: appID)
-                return
-            case "up": goUp(from: dir)
-            default: break
+                case "newfile": newFile(in: dir)
+                case "terminal": openTerminal(at: dir); return
+                case "openwith":
+                    let appID = c.queryItems?.first(where: { $0.name == "app" })?.value
+                    // No app means "Other App…", where the user picks one themselves.
+                    if let appID, !editors.contains(where: { $0.id == appID }) {
+                        continue
+                    }
+                    openFolder(dir, appID: appID)
+                    return
+                case "up": goUp(from: dir)
+                default: break
             }
         }
         finish()
@@ -39,7 +44,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Launched by a menu item, a findermenu:// link arrives right away; otherwise the user opened the app.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if !self.handledURL { self.showSettings() }
+            if !self.handledURL {
+                self.showSettings()
+            }
         }
     }
 
@@ -48,14 +55,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    // Opened directly, the helper behaves like a regular app (Dock icon, ⌘W, ⌘Q) and quits with its window.
+    /// Opened directly, the helper behaves like a regular app (Dock icon, ⌘W, ⌘Q) and quits with its window.
     private func showSettings() {
         if settingsWindow == nil {
             NSApp.setActivationPolicy(.regular)
             NSApp.mainMenu = makeMainMenu()
             let controller = SettingsWindowController()
-            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: controller.window,
-                                                   queue: .main) { _ in NSApp.terminate(nil) }
+            settingsCloseObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification,
+                object: controller.window,
+                queue: .main
+            ) { _ in NSApp.terminate(nil) }
             settingsWindow = controller
         }
         NSApp.activate(ignoringOtherApps: true)
@@ -76,20 +86,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return main
     }
 
-    // A menu action is done. Quit, unless the settings window is open.
+    /// A menu action is done. Quit, unless the settings window is open.
     private func finish() {
-        if settingsWindow == nil { NSApp.terminate(nil) }
+        if settingsWindow == nil {
+            NSApp.terminate(nil)
+        }
     }
 
-    // Any app can send a findermenu:// link, and so can a website once the browser asks. Opening a
-    // folder they pick in a terminal or IDE can run code from it (a git-aware prompt, an IDE's
-    // folder-open tasks), so only accept links sent by the extension bundled with this app, matched
-    // by code signature hash. Fails closed if the sender can't be identified (e.g. it has quit).
+    /// Any app can send a findermenu:// link, and so can a website once the browser asks. Opening a
+    /// folder they pick in a terminal or IDE can run code from it (a git-aware prompt, an IDE's
+    /// folder-open tasks), so only accept links sent by the extension bundled with this app, matched
+    /// by code signature hash. Fails closed if the sender can't be identified (e.g. it has quit).
     private func sentByOurExtension() -> Bool {
         guard let token = NSAppleEventManager.shared().currentAppleEvent?
-                  .attributeDescriptor(forKeyword: AEKeyword(keySenderAuditTokenAttr))?.data,
-              let ext = Bundle.main.builtInPlugInsURL?.appendingPathComponent("FinderMenuExtension.appex")
-        else { return false }
+            .attributeDescriptor(forKeyword: AEKeyword(keySenderAuditTokenAttr))?.data,
+            let ext = Bundle.main.builtInPlugInsURL?.appendingPathComponent("FinderMenuExtension.appex") else {
+            return false
+        }
         var sender: SecCode?, bundled: SecStaticCode?, info: CFDictionary?, requirement: SecRequirement?
         guard SecCodeCopyGuestWithAttributes(nil, [kSecGuestAttributeAudit: token] as CFDictionary, [], &sender) == errSecSuccess,
               let sender,
@@ -97,29 +110,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let bundled,
               SecCodeCopySigningInformation(bundled, [], &info) == errSecSuccess,
               let cdhash = (info as? [String: Any])?[kSecCodeInfoUnique as String] as? Data,
-              SecRequirementCreateWithString("cdhash H\"\(cdhash.map { String(format: "%02x", $0) }.joined())\"" as CFString,
-                                             [], &requirement) == errSecSuccess
-        else { return false }
+              SecRequirementCreateWithString(
+                  "cdhash H\"\(cdhash.map { String(format: "%02x", $0) }.joined())\"" as CFString,
+                  [],
+                  &requirement
+              ) == errSecSuccess else {
+            return false
+        }
         return SecCodeCheckValidity(sender, [], requirement) == errSecSuccess
     }
 
-    // Only act on existing absolute paths. Files and packages such as .app bundles resolve to the
-    // folder that contains them.
+    /// Only act on existing absolute paths. Files and packages such as .app bundles resolve to the
+    /// folder that contains them.
     private func folder(for path: String) -> String? {
-        guard path.hasPrefix("/") else { return nil }
+        guard path.hasPrefix("/") else {
+            return nil
+        }
         let path = (path as NSString).standardizingPath
         var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { return nil }
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else {
+            return nil
+        }
         let dir = isDir.boolValue && !isPackage(path) ? path : (path as NSString).deletingLastPathComponent
         return isPackage(dir) ? nil : dir
     }
 
-    // Checks the real location, so a symlink to an .app counts as a package too.
+    /// Checks the real location, so a symlink to an .app counts as a package too.
     private func isPackage(_ path: String) -> Bool {
         NSWorkspace.shared.isFilePackage(atPath: (path as NSString).resolvingSymlinksInPath)
     }
 
-    // Moves the Finder window showing `dir` (front-most match, else the front window) up one level.
+    /// Moves the Finder window showing `dir` (front-most match, else the front window) up one level.
     private func goUp(from dir: String) {
         func lit(_ s: String) -> String {
             "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
@@ -141,33 +162,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         """
         var error: NSDictionary?
         NSAppleScript(source: script)?.executeAndReturnError(&error)
-        if let error { NSLog("Finder Menu go-up failed: \(error)") }
+        if let error {
+            NSLog("Finder Menu go-up failed: \(error)")
+        }
     }
 
-    // Uses the terminal picked in settings (or with `finder-menu terminal <app>`), otherwise the first installed one.
+    /// Uses the terminal picked in settings (or with `finder-menu terminal <app>`), otherwise the first installed one.
     private func openTerminal(at dir: String) {
         let ws = NSWorkspace.shared
-        for id in [chosenTerminal].compactMap({ $0 }) + terminals.map(\.id) {
-            guard let app = ws.urlForApplication(withBundleIdentifier: id) else { continue }
+        for id in [chosenTerminal].compactMap(\.self) + terminals.map(\.id) {
+            guard let app = ws.urlForApplication(withBundleIdentifier: id) else {
+                continue
+            }
             let quit: (NSRunningApplication?, Error?) -> Void = { _, _ in DispatchQueue.main.async { self.finish() } }
             switch terminals.first(where: { $0.id == id })?.launch ?? .openFolder {
-            case .openFolder:
-                open(dir, withAppAt: app)
-            case .link(let makeURL):
-                guard let url = makeURL(dir) else { finish(); return }
-                ws.open(url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: quit)
-            case .arguments(let makeArguments):
-                let config = NSWorkspace.OpenConfiguration()
-                config.arguments = makeArguments(dir)
-                config.createsNewApplicationInstance = true
-                ws.openApplication(at: app, configuration: config, completionHandler: quit)
+                case .openFolder:
+                    open(dir, withAppAt: app)
+                case let .link(makeURL):
+                    guard let url = makeURL(dir) else {
+                        finish(); return
+                    }
+                    ws.open(url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: quit)
+                case let .arguments(makeArguments):
+                    let config = NSWorkspace.OpenConfiguration()
+                    config.arguments = makeArguments(dir)
+                    config.createsNewApplicationInstance = true
+                    ws.openApplication(at: app, configuration: config, completionHandler: quit)
             }
             return
         }
         finish()
     }
 
-    // No app ID means "Other App…": let the user pick any app.
+    /// No app ID means "Other App…": let the user pick any app.
     private func openFolder(_ dir: String, appID: String?) {
         if let appID {
             open(dir, withAppAt: NSWorkspace.shared.urlForApplication(withBundleIdentifier: appID))
@@ -183,9 +210,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func open(_ dir: String, withAppAt app: URL?) {
-        guard let app else { finish(); return }
-        NSWorkspace.shared.open([URL(fileURLWithPath: dir, isDirectory: true)], withApplicationAt: app,
-                                configuration: NSWorkspace.OpenConfiguration()) { _, _ in
+        guard let app else {
+            finish(); return
+        }
+        NSWorkspace.shared.open(
+            [URL(fileURLWithPath: dir, isDirectory: true)],
+            withApplicationAt: app,
+            configuration: NSWorkspace.OpenConfiguration()
+        ) { _, _ in
             DispatchQueue.main.async { self.finish() }
         }
     }
@@ -195,7 +227,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var problem: String?
         while true {
             let info = (problem.map { $0 + "\n\n" } ?? "") + "In: " + (dir as NSString).abbreviatingWithTildeInPath
-            guard let entered = askFileName(info: info, suggested: name) else { return }
+            guard let entered = askFileName(info: info, suggested: name) else {
+                return
+            }
 
             name = entered.trimmingCharacters(in: .whitespaces)
             let full = (dir as NSString).appendingPathComponent(name)

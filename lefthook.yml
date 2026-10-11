@@ -1,0 +1,6 @@
+pre-commit:
+  commands:
+    format-and-lint-swift:
+      glob: "*.swift"
+      run: make format lint SWIFT_FILES="'{staged_files}'"
+      stage_fixed: true

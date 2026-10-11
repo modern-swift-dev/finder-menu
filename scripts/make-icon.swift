@@ -3,8 +3,19 @@
 import AppKit
 
 func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
-    NSColor(srgbRed: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255,
-            blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+    NSColor(
+        srgbRed: CGFloat(hex >> 16 & 0xFF) / 255,
+        green: CGFloat(hex >> 8 & 0xFF) / 255,
+        blue: CGFloat(hex & 0xFF) / 255,
+        alpha: alpha
+    )
+}
+
+func gradient(_ start: NSColor, _ end: NSColor) -> NSGradient {
+    guard let gradient = NSGradient(starting: start, ending: end) else {
+        fatalError("Couldn't create a gradient")
+    }
+    return gradient
 }
 
 func withShadow(y: CGFloat, blur: CGFloat, alpha: CGFloat, _ draw: () -> Void) {
@@ -18,15 +29,15 @@ func withShadow(y: CGFloat, blur: CGFloat, alpha: CGFloat, _ draw: () -> Void) {
     NSGraphicsContext.restoreGraphicsState()
 }
 
-// All coordinates are on a 1024×1024 canvas with the origin at the top-left.
+/// All coordinates are on a 1024×1024 canvas with the origin at the top-left.
 func drawIcon() {
     // Body: Apple's macOS icon grid (824pt rounded square, 100pt margin).
     let body = NSBezierPath(roundedRect: NSRect(x: 100, y: 100, width: 824, height: 824), xRadius: 185, yRadius: 185)
     withShadow(y: 10, blur: 22, alpha: 0.28) { color(0x2F7CF6).setFill(); body.fill() }
-    NSGradient(starting: color(0x5BC0FF), ending: color(0x1D63F0))!.draw(in: body, angle: 90)
+    gradient(color(0x5BC0FF), color(0x1D63F0)).draw(in: body, angle: 90)
     NSGraphicsContext.saveGraphicsState()
     body.addClip()
-    NSGradient(starting: NSColor.white.withAlphaComponent(0.22), ending: NSColor.white.withAlphaComponent(0))!
+    gradient(NSColor.white.withAlphaComponent(0.22), NSColor.white.withAlphaComponent(0))
         .draw(in: NSRect(x: 100, y: 100, width: 824, height: 460), angle: 90)
     NSGraphicsContext.restoreGraphicsState()
 
@@ -37,7 +48,7 @@ func drawIcon() {
         NSBezierPath(roundedRect: card, xRadius: 58, yRadius: 58).fill()
     }
     let rowH: CGFloat = 104
-    for i in 0..<4 {
+    for i in 0 ..< 4 {
         let row = NSRect(x: card.minX + 28, y: card.minY + 44 + CGFloat(i) * (rowH + 12), width: card.width - 56, height: rowH)
         let highlighted = i == 1
         if highlighted {
@@ -57,7 +68,11 @@ func drawIcon() {
     let arrow = NSBezierPath()
     for (i, p) in shape.enumerated() {
         let pt = NSPoint(x: tip.x + p.0 * k, y: tip.y + p.1 * k)
-        i == 0 ? arrow.move(to: pt) : arrow.line(to: pt)
+        if i == 0 {
+            arrow.move(to: pt)
+        } else {
+            arrow.line(to: pt)
+        }
     }
     arrow.close()
     arrow.lineJoinStyle = .round
@@ -68,33 +83,55 @@ func drawIcon() {
 }
 
 func render(_ px: Int) -> NSBitmapImageRep {
-    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8, samplesPerPixel: 4,
-                               hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    guard let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: px,
+        pixelsHigh: px,
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    ), let ctx = NSGraphicsContext(bitmapImageRep: rep) else {
+        fatalError("Couldn't create a \(px)px bitmap")
+    }
     NSGraphicsContext.saveGraphicsState()
-    let ctx = NSGraphicsContext(bitmapImageRep: rep)!
     NSGraphicsContext.current = ctx
     let s = CGFloat(px) / 1024
     ctx.cgContext.translateBy(x: 0, y: CGFloat(px))
-    ctx.cgContext.scaleBy(x: s, y: -s)   // top-left origin
+    ctx.cgContext.scaleBy(x: s, y: -s) // top-left origin
     drawIcon()
     NSGraphicsContext.restoreGraphicsState()
     return rep
 }
 
-func png(_ rep: NSBitmapImageRep) -> Data { rep.representation(using: .png, properties: [:])! }
+func png(_ rep: NSBitmapImageRep) -> Data {
+    guard let data = rep.representation(using: .png, properties: [:]) else {
+        fatalError("Couldn't encode a PNG")
+    }
+    return data
+}
 
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-try! png(render(512)).write(to: root.appendingPathComponent("docs/icon.png"))
-let iconset = FileManager.default.temporaryDirectory.appendingPathComponent("AppIcon.iconset")
-try? FileManager.default.removeItem(at: iconset)
-try! FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
-for pt in [16, 32, 128, 256, 512] {
-    try! png(render(pt)).write(to: iconset.appendingPathComponent("icon_\(pt)x\(pt).png"))
-    try! png(render(pt * 2)).write(to: iconset.appendingPathComponent("icon_\(pt)x\(pt)@2x.png"))
+do {
+    try png(render(512)).write(to: root.appendingPathComponent("docs/icon.png"))
+    let iconset = FileManager.default.temporaryDirectory.appendingPathComponent("AppIcon.iconset")
+    try? FileManager.default.removeItem(at: iconset)
+    try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
+    for pt in [16, 32, 128, 256, 512] {
+        try png(render(pt)).write(to: iconset.appendingPathComponent("icon_\(pt)x\(pt).png"))
+        try png(render(pt * 2)).write(to: iconset.appendingPathComponent("icon_\(pt)x\(pt)@2x.png"))
+    }
+
+    let iconutil = Process()
+    iconutil.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
+    iconutil.arguments = ["-c", "icns", iconset.path, "-o", root.appendingPathComponent("Resources/AppIcon.icns").path]
+    try iconutil.run()
+    iconutil.waitUntilExit()
+    print(iconutil.terminationStatus == 0 ? "Wrote Resources/AppIcon.icns" : "iconutil failed")
+} catch {
+    print("make-icon failed: \(error)")
+    exit(1)
 }
-let iconutil = Process()
-iconutil.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
-iconutil.arguments = ["-c", "icns", iconset.path, "-o", root.appendingPathComponent("Resources/AppIcon.icns").path]
-try! iconutil.run()
-iconutil.waitUntilExit()
-print(iconutil.terminationStatus == 0 ? "Wrote Resources/AppIcon.icns" : "iconutil failed")

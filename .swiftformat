@@ -1,0 +1,32 @@
+--exclude build
+--swiftversion 6.0
+--languagemode 5
+--allman false
+--commas always
+--conflictmarkers reject
+--emptybraces no-space
+--guardelse same-line
+--header strip
+--importgrouping alphabetized
+--indent 4
+--indentcase true
+--linebreaks lf
+--modifierorder
+--self remove
+--selfrequired
+--semicolons inline
+--shortoptionals always
+--smarttabs enabled
+--stripunusedargs always
+--tabwidth 4
+--trailingclosures
+--trimwhitespace always
+--voidtype void
+--wraparguments before-first
+--wrapcollections before-first
+--wrapconditions after-first
+--wrapparameters before-first
+--wrapreturntype preserve
+--maxwidth 200
+--enable redundantOptionalBinding,isEmpty,wrapIfStatementBodies,wrapGuardStatementBodies,wrapIfExpressionBodies,wrapEnumCases,wrapSwitchCases
+--disable redundantAsync,redundantSendable,unusedArguments,wrapSingleLineComments,initCoderUnavailable,anyObjectProtocol,blankLinesAroundMark,blankLinesAtEndOfScope,blankLinesAtStartOfScope,enumNamespaces,strongOutlets,trailingCommas,wrapMultilineStatementBraces,hoistAwait,hoistTry,redundantSelf

@@ -1,8 +1,8 @@
 import Cocoa
 import UniformTypeIdentifiers
 
-// Shown when Finder Menu.app is opened directly (Spotlight, Finder, `finder-menu settings`).
-// Every change is saved right away and applies on the next right-click.
+/// Shown when Finder Menu.app is opened directly (Spotlight, Finder, `finder-menu settings`).
+/// Every change is saved right away and applies on the next right-click.
 final class SettingsWindowController: NSWindowController {
     private let terminalPopup = NSPopUpButton()
     private let chooseOtherTag = 1
@@ -11,8 +11,9 @@ final class SettingsWindowController: NSWindowController {
         let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Finder Menu Settings"
         self.init(window: window)
-        window.contentView = makeContent()
-        window.setContentSize(window.contentView!.fittingSize)
+        let content = makeContent()
+        window.contentView = content
+        window.setContentSize(content.fittingSize)
         window.center()
     }
 
@@ -56,7 +57,9 @@ final class SettingsWindowController: NSWindowController {
         stack.spacing = 8
         stack.setCustomSpacing(20, after: header)
         stack.setCustomSpacing(10, after: itemsLabel)
-        stack.setCustomSpacing(20, after: checkboxes.last!)
+        if let lastCheckbox = checkboxes.last {
+            stack.setCustomSpacing(20, after: lastCheckbox)
+        }
         stack.setCustomSpacing(10, after: terminalLabel)
         stack.setCustomSpacing(20, after: terminalPopup)
         terminalPopup.widthAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
@@ -69,7 +72,7 @@ final class SettingsWindowController: NSWindowController {
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -20),
+            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -20)
         ])
         return content
     }
@@ -83,10 +86,12 @@ final class SettingsWindowController: NSWindowController {
     @objc private func toggleItem(_ sender: NSButton) {
         let item = menuItems[sender.tag]
         setHidden(item.id, sender.state == .off)
-        if item.id == "terminal" { terminalPopup.isEnabled = sender.state == .on }
+        if item.id == "terminal" {
+            terminalPopup.isEnabled = sender.state == .on
+        }
     }
 
-    // Automatic, the installed terminals Finder Menu knows, a previously chosen other app, then "Other App…".
+    /// Automatic, the installed terminals Finder Menu knows, a previously chosen other app, then "Other App…".
     private func reloadTerminalPopup() {
         let ws = NSWorkspace.shared
         let installed = terminals.filter { ws.urlForApplication(withBundleIdentifier: $0.id) != nil }
@@ -117,7 +122,9 @@ final class SettingsWindowController: NSWindowController {
     }
 
     @objc private func pickTerminal(_ sender: NSPopUpButton) {
-        guard let item = sender.selectedItem else { return }
+        guard let item = sender.selectedItem else {
+            return
+        }
         if item.tag == chooseOtherTag {
             let panel = NSOpenPanel()
             panel.message = "Choose the app for Open Terminal Here:"

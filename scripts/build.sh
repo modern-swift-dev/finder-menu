@@ -25,6 +25,8 @@ xcrun swiftc -swift-version 5 -O -sdk "$SDK" -target "$TARGET" \
   Sources/FinderMenu/*.swift Sources/Shared/*.swift -o "$APP/Contents/MacOS/FinderMenu"
 
 # Ad-hoc signature ("Sign to Run Locally"). Finder extensions must be sandboxed.
+# The hardened runtime (-o runtime) stops other code from being injected with DYLD_INSERT_LIBRARIES,
+# which could otherwise borrow the helper's permission to control Finder or pose as the extension.
 # The linker already ad-hoc signs the binaries, so hide codesign's "replacing existing signature".
-codesign --force -s - --entitlements Resources/Extension.entitlements "$EXT" 2> >(grep -v "replacing existing signature" >&2)
-codesign --force -s - "$APP" 2> >(grep -v "replacing existing signature" >&2)
+codesign --force -s - -o runtime --entitlements Resources/Extension.entitlements "$EXT" 2> >(grep -v "replacing existing signature" >&2)
+codesign --force -s - -o runtime --entitlements Resources/App.entitlements "$APP" 2> >(grep -v "replacing existing signature" >&2)

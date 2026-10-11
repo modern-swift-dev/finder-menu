@@ -1,5 +1,5 @@
-// Apps offered under "Open Folder With", in menu order; the menu shows only the installed ones.
-// The helper also uses this list to refuse findermenu:// links that name any other app.
+/// Apps offered under "Open Folder With", in menu order; the menu shows only the installed ones.
+/// The helper also uses this list to refuse findermenu:// links that name any other app.
 let editors: [(id: String, name: String)] = [
     ("com.microsoft.VSCode", "Visual Studio Code"),
     ("com.microsoft.VSCodeInsiders", "VS Code Insiders"),
@@ -25,5 +25,5 @@ let editors: [(id: String, name: String)] = [
     ("com.google.android.studio", "Android Studio"),
     ("com.apple.dt.Xcode", "Xcode"),
     ("com.panic.Nova", "Nova"),
-    ("com.barebones.bbedit", "BBEdit"),
+    ("com.barebones.bbedit", "BBEdit")
 ]
